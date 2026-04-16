@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: sakila-web
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sakila.rule=Host(`films.localhost`)"
+      - "traefik.http.routers.sakila.entrypoints=web"
+      - "traefik.http.services.sakila.loadbalancer.server.port=8000"
+
+  traefik:
+    image: traefik:v2.11
+    container_name: traefik-local
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"      # http://films.localhost
+      - "8080:8080"  # панель Traefik
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge
