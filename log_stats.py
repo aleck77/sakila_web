@@ -60,12 +60,21 @@ class LogStats:
             {"$limit": limit},
         ]
         results = list(self.collection.aggregate(pipeline))
+        # return [
+        #     {
+        #         "category": item["_id"]["category"],
+        #         "years": f"{item['_id']['years']['from']}-{item['_id']['years']['to']}",
+        #         "count": item["count"],
+        #         "last_search": item["last_search"],
+        #     }
+        #     for item in results
+        # ]
         return [
             {
-                "category": item["_id"]["category"],
-                "years": f"{item['_id']['years']['from']}-{item['_id']['years']['to']}",
-                "count": item["count"],
-                "last_search": item["last_search"],
+                "category": item.get("_id", {}).get("category", "Неизвестный жанр"),
+                "years": f"{item.get('_id', {}).get('years_from', 'N/A')}-{item.get('_id', {}).get('years_to', 'N/A')}",
+                "count": item.get("count", 0),
+                "last_search": item.get("last_search"),
             }
             for item in results
         ]
@@ -89,11 +98,15 @@ class LogStats:
             params = doc.get("params", {})
             if doc.get("search_type") == "keyword":
                 entry["query"] = f"Keyword: {params.get('keyword')}"
+            # elif doc.get("search_type") == "genre_years":
+            #     entry["query"] = (
+            #         f"Genre: {params.get('category_name')}, "
+            #         f"Years: {params.get('year_from')}-{params.get('year_to')}"
+            #     )
             elif doc.get("search_type") == "genre_years":
-                entry["query"] = (
-                    f"Genre: {params.get('category_name')}, "
-                    f"Years: {params.get('year_from')}-{params.get('year_to')}"
-                )
+                cat_name = params.get('category_name') or f"ID:{params.get('category_id', '?')}"
+                entry["query"] = f"Жанр: {cat_name}, Года: {params.get('year_from')}-{params.get('year_to')}"
+
             elif doc.get("search_type") == "rating":
                 entry["query"] = f"Rating: {params.get('rating')}"
             else:

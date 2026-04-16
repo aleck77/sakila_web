@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sakila Movies</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { padding-top: 1rem; }
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        article header { display: flex; justify-content: space-between; align-items: baseline; }
+        .badge { background: var(--pico-primary-background); color: var(--pico-primary-inverse); padding: 0.2rem 0.5rem; border-radius: 0.5rem; font-size: 0.8em; }
+    </style>
+</head>
+<body class="container">
+    <nav>
+        <ul><li><strong>🎬 Sakila Movies</strong></li></ul>
+        <ul>
+            <li><a href="/">Поиск</a></li>
+            <li><a href="/stats">Статистика</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <!-- Формы поиска в виде сетки -->
+        <div class="grid">
+            <article>
+                <header>Поиск по названию</header>
+                <form action="/api/search/keyword" method="get">
+                    <input type="search" name="q" placeholder="Matrix..." value="{{ q or '' }}" required>
+                    <button type="submit">Искать</button>
+                </form>
+            </article>
+
+            <article>
+                <header>Жанр и Год</header>
+                <form action="/api/search/genre-years" method="get">
+                    <select name="category_id" required>
+                        <option value="" disabled selected>Выберите жанр</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.category_id }}" {% if cat.category_id == category_id %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="grid">
+                        <input type="number" name="year_from" placeholder="От {{ min_year }}" value="{{ year_from or min_year }}" min="{{ min_year }}" max="{{ max_year }}">
+                        <input type="number" name="year_to" placeholder="До {{ max_year }}" value="{{ year_to or max_year }}" min="{{ min_year }}" max="{{ max_year }}">
+                    </div>
+                    <button type="submit">Искать</button>
+                </form>
+            </article>
+
+            <article>
+                <header>По рейтингу</header>
+                <form action="/api/search/rating" method="get">
+                    <select name="rating" required>
+                        <option value="" disabled selected>Выберите рейтинг</option>
+                        {% for r in ratings %}
+                            <option value="{{ r }}" {% if r == rating_val %}selected{% endif %}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">Искать</button>
+                </form>
+            </article>
+        </div>
+
+        <hr>
+
+        <!-- Результаты -->
+        {% if films is defined %}
+            {% if total_found > 0 %}
+                <h3>Найдено фильмов: {{ total_found }} (стр. {{ page }})</h3>
+                <div class="grid-cards">
+                    {% for film in films %}
+                    <article>
+                        <header>
+                            <strong>{{ film.title }}</strong>
+                            <span class="badge">{{ film.rating }}</span>
+                        </header>
+                        <p><small>{{ film.description[:100] }}...</small></p>
+                        <footer>
+                            📅 {{ film.release_year }} | ⏱️ {{ film.length }} мин. | 💰 ${{ film.rental_rate }}
+                            <br><small><i>Жанр: {{ film.category | default('Неизвестно') }} | Язык: {{ film.language }}</i></small>
+                        </footer>
+                    </article>
+                    {% endfor %}
+                </div>
+
+                <!-- Пагинация -->
+                <div style="margin-top: 2rem; display: flex; justify-content: space-between;">
+                    {% if page > 1 %}
+                        {% if search_type == 'keyword' %}
+                            <a href="/api/search/keyword?q={{ q }}&page={{ page - 1 }}" role="button" class="secondary">⬅ Назад</a>
+                        {% elif search_type == 'genre-years' %}
+                            <a href="/api/search/genre-years?category_id={{ category_id }}&year_from={{ year_from }}&year_to={{ year_to }}&page={{ page - 1 }}" role="button" class="secondary">⬅ Назад</a>
+                        {% elif search_type == 'rating' %}
+                            <a href="/api/search/rating?rating={{ rating_val }}&page={{ page - 1 }}" role="button" class="secondary">⬅ Назад</a>
+                        {% endif %}
+                    {% else %}
+                        <div></div>
+                    {% endif %}
+
+                    {% if (page * 10) < total_found %}
+                        {% if search_type == 'keyword' %}
+                            <a href="/api/search/keyword?q={{ q }}&page={{ page + 1 }}" role="button">Вперёд ➡</a>
+                        {% elif search_type == 'genre-years' %}
+                            <a href="/api/search/genre-years?category_id={{ category_id }}&year_from={{ year_from }}&year_to={{ year_to }}&page={{ page + 1 }}" role="button">Вперёд ➡</a>
+                        {% elif search_type == 'rating' %}
+                            <a href="/api/search/rating?rating={{ rating_val }}&page={{ page + 1 }}" role="button">Вперёд ➡</a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            {% else %}
+                <article><h3>Ничего не найдено 😢</h3><p>Попробуйте изменить параметры поиска.</p></article>
+            {% endif %}
+        {% endif %}
+    </main>
+</body>
+</html>

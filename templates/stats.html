@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статистика поисков</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+</head>
+<body class="container">
+    <nav>
+        <ul><li><strong>🎬 Sakila Stats</strong></li></ul>
+        <ul>
+            <li><a href="/">Поиск</a></li>
+            <li><a href="/stats">Статистика</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <h1>Статистика поисков</h1>
+        <p>Аналитика логов из MongoDB</p>
+
+        <div class="grid">
+            <article>
+                <header>Топ-{{ limit }} по ключевым словам</header>
+                <table>
+                    <thead><tr><th>Запрос</th><th>Кол-во</th></tr></thead>
+                    <tbody>
+                        {% for item in top_keywords %}
+                        <tr><td>{{ item.keyword }}</td><td>{{ item.count }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </article>
+
+            <article>
+                <header>Топ-{{ limit }} по жанрам</header>
+                <table>
+                    <thead><tr><th>Жанр / Года</th><th>Кол-во</th></tr></thead>
+                    <tbody>
+                        {% for item in top_genres %}
+                        <tr><td>{{ item.category }} ({{ item.years }})</td><td>{{ item.count }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </article>
+        </div>
+
+        <article>
+            <header>Последние {{ limit }} запросов</header>
+            <table>
+                <thead><tr><th>Время</th><th>Тип</th><th>Запрос</th><th>Найдено</th></tr></thead>
+                <tbody>
+                    {% for item in recent %}
+                    <tr>
+                        <td><small>{{ item.timestamp }}</small></td>
+                        <td><code>{{ item.type }}</code></td>
+                        <td>{{ item.query }}</td>
+                        <td>{{ item.results_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </article>
+    </main>
+</body>
+</html>

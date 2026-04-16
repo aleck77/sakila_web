@@ -1,6 +1,9 @@
 # web_app.py
+from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()   # читает .env автоматически при каждом запуске
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Query, Request
 from fastapi.responses import HTMLResponse
@@ -12,6 +15,9 @@ from log_writer import LogWriter
 from log_stats import LogStats
 
 app = FastAPI(title="Sakila Film Search Web")
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+RESULTS_PER_PAGE = 10
 
 # Простая CORS-настройка (по мере необходимости)
 app.add_middleware(
@@ -113,16 +119,32 @@ HTML_INDEX = """
 </html>
 """
 
+# ---------- Главная страница ----------
+
 @app.get("/", response_class=HTMLResponse)
-async def index():
-    return HTML_INDEX
+async def index(request: Request, svc=Depends(get_services)):
+    mysql = svc["mysql"]
+    categories = mysql.get_all_categories()
+    year_from, year_to = mysql.get_year_range()
+    ratings = mysql.get_all_ratings()
+    
+    return templates.TemplateResponse(
+        request, 
+        "index.html", 
+        {
+            "request": request, 
+            "categories": categories,
+            "min_year": year_from,
+            "max_year": year_to,
+            "ratings": ratings
+        }
+    )
 
-RESULTS_PER_PAGE = 10
+# ---------- API-эндпоинты поиска (теперь возвращают HTML) ----------
 
-# ---------- API-эндпоинты поиска ----------
-
-@app.get("/api/search/keyword")
+@app.get("/api/search/keyword", response_class=HTMLResponse)
 async def search_by_keyword(
+    request: Request,
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
     svc=Depends(get_services),
@@ -134,27 +156,22 @@ async def search_by_keyword(
     offset = (page - 1) * RESULTS_PER_PAGE
     films = mysql.search_by_keyword(q, RESULTS_PER_PAGE, offset)
 
-    # логируем один раз на запрос страницы
-    log_writer.log_search(
-        "keyword",
-        {"keyword": q, "page": page},
-        len(films),
+    log_writer.log_search("keyword", {"keyword": q, "page": page}, len(films))
+
+    return templates.TemplateResponse(
+        request, "index.html",
+        {
+            "request": request, "films": films, "total_found": total, "page": page,
+            "search_type": "keyword", "q": q, "categories": mysql.get_all_categories(),
+            "min_year": mysql.get_year_range()[0], "max_year": mysql.get_year_range()[1],
+            "ratings": mysql.get_all_ratings()
+        }
     )
 
-    return {
-        "query": q,
-        "page": page,
-        "page_size": RESULTS_PER_PAGE,
-        "total_found": total,
-        "films": films,
-    }
-
-
-@app.get("/api/search/genre-years")
+@app.get("/api/search/genre-years", response_class=HTMLResponse)
 async def search_by_genre_years(
-    category_id: int,
-    year_from: int,
-    year_to: int,
+    request: Request,
+    category_id: int, year_from: int, year_to: int,
     page: int = Query(1, ge=1),
     svc=Depends(get_services),
 ):
@@ -163,34 +180,34 @@ async def search_by_genre_years(
 
     total = mysql.count_by_genre_and_years(category_id, year_from, year_to)
     offset = (page - 1) * RESULTS_PER_PAGE
-    films = mysql.search_by_genre_and_years(
-        category_id, year_from, year_to, RESULTS_PER_PAGE, offset
-    )
+    films = mysql.search_by_genre_and_years(category_id, year_from, year_to, RESULTS_PER_PAGE, offset)
 
+    # 1. Находим имя жанра по его ID из списка всех жанров
+    categories = mysql.get_all_categories()
+    category_name = next((c["name"] for c in categories if c["category_id"] == category_id), str(category_id))
     log_writer.log_search(
-        "genre_years",
+        "genre_years", 
         {
-            "category_id": category_id,
-            "year_from": year_from,
-            "year_to": year_to,
-            "page": page,
-        },
-        len(films),
+            "category_name": category_name, 
+            "year_from": year_from, 
+            "year_to": year_to, 
+            "page": page
+        }, 
+        len(films))
+
+    return templates.TemplateResponse(
+        request, "index.html",
+        {
+            "request": request, "films": films, "total_found": total, "page": page,
+            "search_type": "genre-years", "category_id": category_id, "year_from": year_from, "year_to": year_to,
+            "categories": mysql.get_all_categories(), "min_year": mysql.get_year_range()[0], "max_year": mysql.get_year_range()[1],
+            "ratings": mysql.get_all_ratings()
+        }
     )
 
-    return {
-        "category_id": category_id,
-        "year_from": year_from,
-        "year_to": year_to,
-        "page": page,
-        "page_size": RESULTS_PER_PAGE,
-        "total_found": total,
-        "films": films,
-    }
-
-
-@app.get("/api/search/rating")
+@app.get("/api/search/rating", response_class=HTMLResponse)
 async def search_by_rating(
+    request: Request,
     rating: str,
     page: int = Query(1, ge=1),
     svc=Depends(get_services),
@@ -202,35 +219,31 @@ async def search_by_rating(
     offset = (page - 1) * RESULTS_PER_PAGE
     films = mysql.search_by_rating(rating, RESULTS_PER_PAGE, offset)
 
-    log_writer.log_search(
-        "rating",
-        {"rating": rating, "page": page},
-        len(films),
+    log_writer.log_search("rating", {"rating": rating, "page": page}, len(films))
+
+    return templates.TemplateResponse(
+        request, "index.html",
+        {
+            "request": request, "films": films, "total_found": total, "page": page,
+            "search_type": "rating", "rating_val": rating,
+            "categories": mysql.get_all_categories(), "min_year": mysql.get_year_range()[0], "max_year": mysql.get_year_range()[1],
+            "ratings": mysql.get_all_ratings()
+        }
     )
 
-    return {
-        "rating": rating,
-        "page": page,
-        "page_size": RESULTS_PER_PAGE,
-        "total_found": total,
-        "films": films,
-    }
+# ---------- API-эндпоинты статистики (возвращают HTML) ----------
 
-# ---------- API-эндпоинты статистики ----------
-
-@app.get("/api/stats/top-keywords")
-async def top_keywords(limit: int = 5, svc=Depends(get_services)):
-    stats = svc["log_stats"].get_top_keyword_searches(limit)
-    return {"limit": limit, "items": stats}
-
-
-@app.get("/api/stats/top-genres")
-async def top_genres(limit: int = 5, svc=Depends(get_services)):
-    stats = svc["log_stats"].get_top_genre_searches(limit)
-    return {"limit": limit, "items": stats}
-
-
-@app.get("/api/stats/recent")
-async def recent_searches(limit: int = 5, svc=Depends(get_services)):
-    stats = svc["log_stats"].get_recent_searches(limit)
-    return {"limit": limit, "items": stats}
+@app.get("/stats", response_class=HTMLResponse)
+async def view_stats(request: Request, limit: int = 10, svc=Depends(get_services)):
+    log_stats = svc["log_stats"]
+    
+    return templates.TemplateResponse(
+        request, "stats.html",
+        {
+            "request": request,
+            "limit": limit,
+            "top_keywords": log_stats.get_top_keyword_searches(limit),
+            "top_genres": log_stats.get_top_genre_searches(limit),
+            "recent": log_stats.get_recent_searches(limit)
+        }
+    )
