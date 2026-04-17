@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  sakila_web:
+    image: ghcr.io/<your_github_username>/sakila-web:latest   # или build: . если будете билдить прямо на VPS
+    # Если хочешь билдить на VPS, вместо image: используй:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    container_name: sakila_web
+    env_file:
+      - .env.prod
+    networks:
+      - n8n_default
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=n8n_default"
+      # Router
+      - "traefik.http.routers.sakila.rule=Host(`sakila.artelegis.com.ua`)"
+      - "traefik.http.routers.sakila.entrypoints=websecure"
+      - "traefik.http.routers.sakila.tls.certresolver=mytlschallenge"
+      # Какой сервис и порт внутри контейнера использовать
+      - "traefik.http.services.sakila.loadbalancer.server.port=8000"
+
+networks:
+  n8n_default:
+    external: true
