@@ -1,15 +1,13 @@
-version: "3.9"
-
 services:
   sakila_web:
-    image: ghcr.io/<your_github_username>/sakila-web:latest   # или build: . если будете билдить прямо на VPS
+    # image: ghcr.io/<your_github_username>/sakila-web:latest   # или build: . если будете билдить прямо на VPS
     # Если хочешь билдить на VPS, вместо image: используй:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: sakila_web
     env_file:
-      - .env.prod
+      - .env
     networks:
       - n8n_default
     restart: unless-stopped
