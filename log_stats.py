@@ -60,15 +60,7 @@ class LogStats:
             {"$limit": limit},
         ]
         results = list(self.collection.aggregate(pipeline))
-        # return [
-        #     {
-        #         "category": item["_id"]["category"],
-        #         "years": f"{item['_id']['years']['from']}-{item['_id']['years']['to']}",
-        #         "count": item["count"],
-        #         "last_search": item["last_search"],
-        #     }
-        #     for item in results
-        # ]
+
         return [
             {
                 "category": item.get("_id", {}).get("category", "Неизвестный жанр"),
@@ -98,11 +90,7 @@ class LogStats:
             params = doc.get("params", {})
             if doc.get("search_type") == "keyword":
                 entry["query"] = f"Keyword: {params.get('keyword')}"
-            # elif doc.get("search_type") == "genre_years":
-            #     entry["query"] = (
-            #         f"Genre: {params.get('category_name')}, "
-            #         f"Years: {params.get('year_from')}-{params.get('year_to')}"
-            #     )
+
             elif doc.get("search_type") == "genre_years":
                 cat_name = params.get('category_name') or f"ID:{params.get('category_id', '?')}"
                 entry["query"] = f"Жанр: {cat_name}, Года: {params.get('year_from')}-{params.get('year_to')}"
